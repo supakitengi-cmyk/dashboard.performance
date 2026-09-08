@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>Executive Production & Workload Control Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-exec: #090d16;
+            --card-bg: #131c31;
+            --card-border: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.15);
+        }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg-exec); margin: 0; padding: 30px; color: var(--text-main); }
+        .container { max-width: 1750px; margin: 0 auto; }
+        
+        .exec-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 20px; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
+        .exec-header h1 { font-size: 24px; color: #ffffff; margin: 0; font-weight: 700; letter-spacing: -0.5px; }
+        .exec-header p { color: var(--text-muted); font-size: 13px; margin: 5px 0 0 0; }
+        
+        .header-actions { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .last-save-time { font-size: 12px; color: var(--text-muted); background: rgba(19, 28, 49, 0.9); padding: 8px 14px; border-radius: 10px; border: 1px solid var(--card-border); }
+        .last-save-time span { color: var(--accent); font-weight: 600; }
+
+        /* Executive Summary Report Box */
+        .exec-report-card { background: linear-gradient(135deg, #131c31 0%, #1a2844 100%); padding: 20px 25px; border-radius: 16px; border: 1px solid rgba(56, 189, 248, 0.2); margin-bottom: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .exec-report-card h3 { margin: 0 0 10px 0; font-size: 16px; color: var(--accent); display: flex; align-items: center; gap: 8px; font-weight: 600; }
+        .exec-report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-top: 12px; }
+        .exec-report-item { background: rgba(15, 23, 42, 0.6); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--card-border); font-size: 13px; }
+        .exec-report-item span { display: block; color: var(--text-muted); font-size: 11px; margin-bottom: 4px; }
+        .exec-report-item b { font-size: 15px; color: #fff; }
+
+        .dashboard-grid { display: grid; grid-template-columns: 1fr; gap: 25px; }
+        .production-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+        @media (max-width: 1400px) { .production-grid { grid-template-columns: 1fr; } }
+
+        .chart-card { background: var(--card-bg); padding: 22px; border-radius: 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border: 1px solid var(--card-border); }
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 15px; }
+        .chart-header h3 { margin: 0; font-size: 16px; color: #ffffff; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        
+        .toggle-table-btn { background: #1e293b; color: var(--accent); border: 1px solid var(--card-border); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; }
+        .toggle-table-btn:hover { background: #334155; }
+        
+        .clear-data-btn { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; }
+        .clear-data-btn:hover { background: rgba(239, 68, 68, 0.3); }
+
+        .save-file-btn { background: #0284c7; color: #fff; border: none; padding: 8px 16px; border-radius: 9px; cursor: pointer; font-size: 12px; font-weight: 600; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3); transition: all 0.2s; }
+        .save-file-btn:hover { background: #0369a1; }
+
+        .data-input-container { background: rgba(9, 13, 22, 0.9); padding: 15px; border-radius: 12px; border: 1px solid var(--card-border); margin-bottom: 15px; overflow-x: auto; display: none; }
+        .data-input-container.show { display: block; }
+        
+        .input-table { width: 100%; border-collapse: collapse; min-width: 750px; }
+        .input-table th, .input-table td { padding: 5px 6px; text-align: center; border: 1px solid var(--card-border); font-size: 11px; }
+        .input-table th { background: #131c31; color: var(--text-muted); font-weight: 600; }
+        .input-table td.row-label { text-align: left; font-weight: 600; color: #f8fafc; background: rgba(19, 28, 49, 0.5); }
+        .input-table input { width: 100%; background: #090d16; border: 1px solid var(--card-border); color: #fff; padding: 5px; border-radius: 5px; font-size: 11px; text-align: center; font-weight: 600; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .input-table input:focus { outline: none; border-color: var(--accent); }
+        .target-row input { background: #1e293b; color: #f43f5e; font-weight: 700; }
+
+        .canvas-container { position: relative; height: 350px; width: 100%; }
+
+        .workload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+        @media (max-width: 1200px) { .workload-grid { grid-template-columns: 1fr; } }
+
+        .workload-box { background: rgba(9, 13, 22, 0.5); padding: 18px; border-radius: 14px; border: 1px solid var(--card-border); display: flex; flex-direction: column; justify-content: space-between; }
+        
+        .workload-form-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .workload-form-group div label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
+        .workload-form-group div input { width: 100%; background: #090d16; border: 1px solid var(--card-border); color: #fff; padding: 6px; border-radius: 7px; font-size: 12px; font-weight: 600; box-sizing: border-box; text-align: center; }
+        .workload-form-group div input:focus { outline: none; border-color: var(--accent); }
+
+        .workload-result-box { margin-top: 10px; padding: 10px 14px; background: rgba(56, 189, 248, 0.05); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 10px; display: flex; flex-direction: column; gap: 5px; }
+
+        .badge-minus { background: rgba(239, 68, 68, 0.15); color: #f87171; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .badge-plus { background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.3); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="exec-header">
+            <div>
+                <h1>Executive Production & Workload Control Dashboard</h1>
+                <p>รายงานประสิทธิภาพการผลิต Output vs Target และวิเคราะห์ Workload Remain (CNC Milling & CNC Lathe)</p>
+            </div>
+            <div class="header-actions">
+                <div class="last-save-time">🕒 บันทึกล่าสุด: <span id="save-timestamp">-</span></div>
+                <button class="save-file-btn" onclick="saveAsHTML()">💾 ดาวน์โหลดไฟล์ HTML</button>
+            </div>
+        </div>
+
+        <!-- Executive Report Section (Report สำหรับผู้บริหารระดับสูง) -->
+        <div class="exec-report-card">
+            <h3>📈 Production Summary Report </h3>
+            <div class="exec-report-grid">
+                <div class="exec-report-item">
+                    <span>CNC MILLING PERFORMANCE</span>
+                    <b id="exec-milling-summary">-</b>
+                </div>
+                <div class="exec-report-item">
+                    <span>CNC LATHE PERFORMANCE</span>
+                    <b id="exec-lathe-summary">-</b>
+                </div>
+                <div class="exec-report-item">
+                    <span>TOTAL WORKLOAD BURDEN</span>
+                    <b id="exec-workload-summary">-</b>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <!-- CNC Milling & CNC Lathe Side-by-Side Grid -->
+            <div class="production-grid">
+                <!-- CNC Milling Section -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>⚙️ CNC Milling Output vs Target</h3>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="toggle-table-btn" onclick="toggleTable('milling')">📝 กรอกข้อมูล</button>
+                            <button class="clear-data-btn" onclick="clearTableData('milling')">🗑️ ล้างข้อมูล</button>
+                            <div id="milling-status"><span class="badge-plus">+0 หน่วย</span></div>
+                        </div>
+                    </div>
+                    <div class="data-input-container" id="milling-container">
+                        <table class="input-table" id="milling-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 15%;">Category</th>
+                                    <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="canvas-container">
+                        <canvas id="millingChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- CNC Lathe Section -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>⚙️ CNC Lathe Output vs Target</h3>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="toggle-table-btn" onclick="toggleTable('lathe')">📝 กรอกข้อมูล</button>
+                            <button class="clear-data-btn" onclick="clearTableData('lathe')">🗑️ ล้างข้อมูล</button>
+                            <div id="lathe-status"><span class="badge-plus">+0 หน่วย</span></div>
+                        </div>
+                    </div>
+                    <div class="data-input-container" id="lathe-container">
+                        <table class="input-table" id="lathe-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 15%;">Category</th>
+                                    <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="canvas-container">
+                        <canvas id="latheChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workload Pending Analysis -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3>📊 Workload Pending Analysis (Workload Remain & Days Required)</h3>
+                </div>
+                <div class="workload-grid">
+                    <!-- CNC Milling Workload Box -->
+                    <div class="workload-box">
+                        <div>
+                            <h4 style="color: #38bdf8; margin: 0 0 10px 0; font-size: 14px;">⚙️ CNC Milling Workload Remain</h4>
+                            <div class="workload-form-group">
+                                <div>
+                                    <label>Plan Remain (หน่วย):</label>
+                                    <input type="number" id="milling-plan-remain" value="0" step="500">
+                                </div>
+                                <div>
+                                    <label>Backlog Remain (หน่วย):</label>
+                                    <input type="number" id="milling-backlog-remain" value="0" step="500">
+                                </div>
+                            </div>
+                            <div class="workload-form-group">
+                                <div>
+                                    <label>Over issue Remain (หน่วย):</label>
+                                    <input type="number" id="milling-overissue-remain" value="0" step="100">
+                                </div>
+                                <div>
+                                    <label>จำนวนเครื่องจักร:</label>
+                                    <input type="number" id="milling-machines" value="1" min="1" step="1">
+                                </div>
+                            </div>
+                            <div class="workload-form-group" style="grid-template-columns: 1fr;">
+                                <div>
+                                    <label>กำลังผลิต (นาที/วัน/เครื่อง):</label>
+                                    <input type="number" id="milling-cap-per-machine" value="960" min="1" step="10">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="canvas-container" style="height: 170px;">
+                            <canvas id="millingWorkloadChart"></canvas>
+                        </div>
+                        <div class="workload-result-box">
+                            <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; gap: 5px;">
+                                <span>Plan: <b id="milling-plan-days" style="color: #38bdf8;">0.00 วัน</b></span>
+                                <span>Backlog: <b id="milling-backlog-days" style="color: #60a5fa;">0.00 วัน</b></span>
+                                <span>Over issue: <b id="milling-overissue-days" style="color: #f87171;">0.00 วัน</b></span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(56, 189, 248, 0.2); padding-top: 4px; margin-top: 2px;">
+                                <p style="margin: 0; font-size: 11px; color: var(--text-muted);">รวมระยะเวลาผลิต:</p>
+                                <h4 id="milling-days-result" style="margin: 0; font-size: 15px; color: var(--accent);">0.00 วัน</h4>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CNC Lathe Workload Box -->
+                    <div class="workload-box">
+                        <div>
+                            <h4 style="color: #34d399; margin: 0 0 10px 0; font-size: 14px;">⚙️ CNC Lathe Workload Remain</h4>
+                            <div class="workload-form-group">
+                                <div>
+                                    <label>Plan Remain (หน่วย):</label>
+                                    <input type="number" id="lathe-plan-remain" value="0" step="500">
+                                </div>
+                                <div>
+                                    <label>Backlog Remain (หน่วย):</label>
+                                    <input type="number" id="lathe-backlog-remain" value="0" step="500">
+                                </div>
+                            </div>
+                            <div class="workload-form-group">
+                                <div>
+                                    <label>Over issue Remain (หน่วย):</label>
+                                    <input type="number" id="lathe-overissue-remain" value="0" step="100">
+                                </div>
+                                <div>
+                                    <label>จำนวนเครื่องจักร:</label>
+                                    <input type="number" id="lathe-machines" value="10" min="1" step="1">
+                                </div>
+                            </div>
+                            <div class="workload-form-group" style="grid-template-columns: 1fr;">
+                                <div>
+                                    <label>กำลังผลิต (นาที/วัน/เครื่อง):</label>
+                                    <input type="number" id="lathe-cap-per-machine" value="960" min="1" step="10">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="canvas-container" style="height: 170px;">
+                            <canvas id="latheWorkloadChart"></canvas>
+                        </div>
+                        <div class="workload-result-box" style="background: rgba(52, 211, 153, 0.05); border-color: rgba(52, 211, 153, 0.2);">
+                            <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; gap: 5px;">
+                                <span>Plan: <b id="lathe-plan-days" style="color: #34d399;">0.00 วัน</b></span>
+                                <span>Backlog: <b id="lathe-backlog-days" style="color: #6ee7b7;">0.00 วัน</b></span>
+                                <span>Over issue: <b id="lathe-overissue-days" style="color: #f87171;">0.00 วัน</b></span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(52, 211, 153, 0.2); padding-top: 4px; margin-top: 2px;">
+                                <p style="margin: 0; font-size: 11px; color: var(--text-muted);">รวมระยะเวลาผลิต:</p>
+                                <h4 id="lathe-days-result" style="margin: 0; font-size: 15px; color: #34d399;">0.00 วัน</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        Chart.register(ChartDataLabels);
+
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const categories = ['Plan WK', 'Backlog', 'Over issue', 'ADV'];
+
+        const initialMillingData = {
+            'Plan WK': [5000, 5200, 4800, 5100, 5300, 4000, 3800],
+            'Backlog': [1000, 1200, 1100, 1300, 1250, 800, 700],
+            'Over issue': [200, 300, 250, 400, 350, 150, 100],
+            'ADV': [500, 400, 450, 600, 550, 300, 200],
+            'Target': [7500, 7500, 7500, 7500, 7500, 6000, 6000]
+        };
+
+        const initialLatheData = {
+            'Plan WK': [4000, 4100, 3900, 4200, 4300, 3200, 3000],
+            'Backlog': [800, 900, 850, 950, 900, 600, 500],
+            'Over issue': [150, 200, 180, 250, 220, 100, 90],
+            'ADV': [300, 350, 320, 400, 380, 200, 150],
+            'Target': [6000, 6000, 6000, 6000, 6000, 4500, 4500]
+        };
+
+        let millingChartInst = null;
+        let latheChartInst = null;
+        let millingWorkloadInst = null;
+        let latheWorkloadInst = null;
+
+        function toggleTable(machineKey) {
+            const container = document.getElementById(machineKey + '-container');
+            container.classList.toggle('show');
+        }
+
+        // ฟังก์ชันล้างข้อมูลเฉพาะช่องที่ไม่ใช่ Target
+        function clearTableData(machineKey) {
+            categories.forEach(cat => {
+                for(let i=0; i<7; i++) {
+                    const input = document.getElementById(`${machineKey}-${cat}-${i}`);
+                    if(input) input.value = 0;
+                }
+            });
+            handleUserInputChange();
+        }
+
+        function buildTable(machineKey, dataObj, updateCallback) {
+            const tbody = document.querySelector(`#${machineKey}-table tbody`);
+            tbody.innerHTML = '';
+
+            categories.forEach(cat => {
+                let tr = document.createElement('tr');
+                let html = `<td class="row-label">${cat}</td>`;
+                for(let i=0; i<7; i++) {
+                    html += `<td><input type="number" id="${machineKey}-${cat}-${i}" value="${dataObj[cat][i]}" step="50"></td>`;
+                }
+                tr.innerHTML = html;
+                tbody.appendChild(tr);
+            });
+
+            let targetTr = document.createElement('tr');
+            targetTr.className = 'target-row';
+            let targetHtml = `<td class="row-label" style="color: #f43f5e;">🎯 Target</td>`;
+            for(let i=0; i<7; i++) {
+                targetHtml += `<td><input type="number" id="${machineKey}-Target-${i}" value="${dataObj['Target'][i]}" step="100"></td>`;
+            }
+            targetTr.innerHTML = targetHtml;
+            tbody.appendChild(targetTr);
+
+            tbody.querySelectorAll('input').forEach(inp => {
+                inp.addEventListener('input', updateCallback);
+            });
+        }
+
+        function getDataFromTable(machineKey) {
+            let res = { datasets: {}, targets: [] };
+            categories.forEach(cat => {
+                res.datasets[cat] = [];
+                for(let i=0; i<7; i++) {
+                    let val = parseFloat(document.getElementById(`${machineKey}-${cat}-${i}`).value) || 0;
+                    res.datasets[cat].push(val);
+                }
+            });
+            res.targets = [];
+            for(let i=0; i<7; i++) {
+                let val = parseFloat(document.getElementById(`${machineKey}-Target-${i}`).value) || 0;
+                res.targets.push(val);
+            }
+            return res;
+        }
+
+        function getCurrentTimestampString() {
+            const now = new Date();
+            return now.toLocaleString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        }
+
+        function saveToLocalStorage() {
+            const timeStr = getCurrentTimestampString();
+            document.getElementById('save-timestamp').innerText = timeStr;
+            
+            const data = {
+                timestamp: timeStr,
+                milling: getDataFromTable('milling'),
+                lathe: getDataFromTable('lathe'),
+                workload: {
+                    millingPlanRemain: document.getElementById('milling-plan-remain').value,
+                    millingBacklogRemain: document.getElementById('milling-backlog-remain').value,
+                    millingOverIssueRemain: document.getElementById('milling-overissue-remain').value,
+                    millingMachines: document.getElementById('milling-machines').value,
+                    millingCap: document.getElementById('milling-cap-per-machine').value,
+                    lathePlanRemain: document.getElementById('lathe-plan-remain').value,
+                    latheBacklogRemain: document.getElementById('lathe-backlog-remain').value,
+                    latheOverIssueRemain: document.getElementById('lathe-overissue-remain').value,
+                    latheMachines: document.getElementById('lathe-machines').value,
+                    latheCap: document.getElementById('lathe-cap-per-machine').value
+                }
+            };
+            localStorage.setItem('exec_dashboard_saved_data', JSON.stringify(data));
+        }
+
+        function loadFromLocalStorage() {
+            const saved = localStorage.getItem('exec_dashboard_saved_data');
+            if (!saved) return false;
+            try {
+                const data = JSON.parse(saved);
+                if(data.timestamp) document.getElementById('save-timestamp').innerText = data.timestamp;
+                categories.forEach(cat => {
+                    for(let i=0; i<7; i++) {
+                        if(data.milling.datasets[cat]?.[i] !== undefined) document.getElementById(`milling-${cat}-${i}`).value = data.milling.datasets[cat][i];
+                        if(data.lathe.datasets[cat]?.[i] !== undefined) document.getElementById(`lathe-${cat}-${i}`).value = data.lathe.datasets[cat][i];
+                    }
+                });
+                for(let i=0; i<7; i++) {
+                    if(data.milling.targets?.[i] !== undefined) document.getElementById(`milling-Target-${i}`).value = data.milling.targets[i];
+                    if(data.lathe.targets?.[i] !== undefined) document.getElementById(`lathe-Target-${i}`).value = data.lathe.targets[i];
+                }
+                if(data.workload) {
+                    document.getElementById('milling-plan-remain').value = data.workload.millingPlanRemain || 0;
+                    document.getElementById('milling-backlog-remain').value = data.workload.millingBacklogRemain || 0;
+                    document.getElementById('milling-overissue-remain').value = data.workload.millingOverIssueRemain || 0;
+                    document.getElementById('milling-machines').value = data.workload.millingMachines || 1;
+                    document.getElementById('milling-cap-per-machine').value = data.workload.millingCap || 960;
+                    document.getElementById('lathe-plan-remain').value = data.workload.lathePlanRemain || 0;
+                    document.getElementById('lathe-backlog-remain').value = data.workload.latheBacklogRemain || 0;
+                    document.getElementById('lathe-overissue-remain').value = data.workload.latheOverIssueRemain || 0;
+                    document.getElementById('lathe-machines').value = data.workload.latheMachines || 10;
+                    document.getElementById('lathe-cap-per-machine').value = data.workload.latheCap || 960;
+                }
+                return true;
+            } catch(e) { return false; }
+        }
+
+        function saveAsHTML() {
+            saveToLocalStorage();
+            document.querySelectorAll('input').forEach(input => input.setAttribute('value', input.value));
+            const blob = new Blob(["<!DOCTYPE html>\n" + document.documentElement.outerHTML], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'executive_dashboard.html';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function refreshChartsOnly() {
+            const millingLive = getDataFromTable('milling');
+            const latheLive = getDataFromTable('lathe');
+            renderChart('millingChart', millingLive, 'milling-status');
+            renderChart('latheChart', latheLive, 'lathe-status');
+            updateWorkloadCalculationsOnly();
+        }
+
+        function handleUserInputChange() {
+            refreshChartsOnly();
+            saveToLocalStorage();
+        }
+
+        function updateExecutiveReport(millingDiff, latheDiff, millingTotalDays, latheTotalDays) {
+            const millingStatusEl = document.getElementById('exec-milling-summary');
+            const latheStatusEl = document.getElementById('exec-lathe-summary');
+            const workloadStatusEl = document.getElementById('exec-workload-summary');
+
+            millingStatusEl.innerHTML = millingDiff >= 0 
+                ? `<span style="color: #34d399;">🟢 เกินเป้าหมาย (+${millingDiff.toLocaleString()} หน่วย)</span>` 
+                : `<span style="color: #f87171;">🔴 ต่ำกว่าเป้า (${millingDiff.toLocaleString()} หน่วย)</span>`;
+
+            latheStatusEl.innerHTML = latheDiff >= 0 
+                ? `<span style="color: #34d399;">🟢 เกินเป้าหมาย (+${latheDiff.toLocaleString()} หน่วย)</span>` 
+                : `<span style="color: #f87171;">🔴 ต่ำกว่าเป้า (${latheDiff.toLocaleString()} หน่วย)</span>`;
+
+            workloadStatusEl.innerHTML = `<span style="color: #38bdf8;">Milling: ${millingTotalDays.toFixed(1)} วัน | Lathe: ${latheTotalDays.toFixed(1)} วัน</span>`;
+        }
+
+        function updateWorkloadCalculationsOnly() {
+            const millingPlan = parseFloat(document.getElementById('milling-plan-remain').value) || 0;
+            const millingBacklog = parseFloat(document.getElementById('milling-backlog-remain').value) || 0;
+            const millingOverIssue = parseFloat(document.getElementById('milling-overissue-remain').value) || 0;
+            const millingCapTotal = (parseFloat(document.getElementById('milling-machines').value) || 1) * (parseFloat(document.getElementById('milling-cap-per-machine').value) || 1);
+            
+            const millingPlanDays = millingCapTotal > 0 ? (millingPlan / millingCapTotal) : 0;
+            const millingBacklogDays = millingCapTotal > 0 ? (millingBacklog / millingCapTotal) : 0;
+            const millingOverIssueDays = millingCapTotal > 0 ? (millingOverIssue / millingCapTotal) : 0;
+            const millingTotalDays = millingPlanDays + millingBacklogDays + millingOverIssueDays;
+
+            document.getElementById('milling-plan-days').innerText = millingPlanDays.toFixed(2) + ' วัน';
+            document.getElementById('milling-backlog-days').innerText = millingBacklogDays.toFixed(2) + ' วัน';
+            document.getElementById('milling-overissue-days').innerText = millingOverIssueDays.toFixed(2) + ' วัน';
+            document.getElementById('milling-days-result').innerText = millingTotalDays.toFixed(2) + ' วัน';
+
+            const lathePlan = parseFloat(document.getElementById('lathe-plan-remain').value) || 0;
+            const latheBacklog = parseFloat(document.getElementById('lathe-backlog-remain').value) || 0;
+            const latheOverIssue = parseFloat(document.getElementById('lathe-overissue-remain').value) || 0;
+            const latheCapTotal = (parseFloat(document.getElementById('lathe-machines').value) || 1) * (parseFloat(document.getElementById('lathe-cap-per-machine').value) || 1);
+            
+            const lathePlanDays = latheCapTotal > 0 ? (lathePlan / latheCapTotal) : 0;
+            const latheBacklogDays = latheCapTotal > 0 ? (latheBacklog / latheCapTotal) : 0;
+            const latheOverIssueDays = latheCapTotal > 0 ? (latheOverIssue / latheCapTotal) : 0;
+            const latheTotalDays = lathePlanDays + latheBacklogDays + latheOverIssueDays;
+
+            document.getElementById('lathe-plan-days').innerText = lathePlanDays.toFixed(2) + ' วัน';
+            document.getElementById('lathe-backlog-days').innerText = latheBacklogDays.toFixed(2) + ' วัน';
+            document.getElementById('lathe-overissue-days').innerText = latheOverIssueDays.toFixed(2) + ' วัน';
+            document.getElementById('lathe-days-result').innerText = latheTotalDays.toFixed(2) + ' วัน';
+
+            updateWorkloadBarCharts(millingPlan, millingBacklog, millingOverIssue, lathePlan, latheBacklog, latheOverIssue);
+            
+            const millingLive = getDataFromTable('milling');
+            const latheLive = getDataFromTable('lathe');
+            const mDiff = millingLive.datasets['Plan WK'].reduce((a,b)=>a+b,0) + millingLive.datasets['Backlog'].reduce((a,b)=>a+b,0) + millingLive.datasets['Over issue'].reduce((a,b)=>a+b,0) + millingLive.datasets['ADV'].reduce((a,b)=>a+b,0) - millingLive.targets.reduce((a,b)=>a+b,0);
+            const lDiff = latheLive.datasets['Plan WK'].reduce((a,b)=>a+b,0) + latheLive.datasets['Backlog'].reduce((a,b)=>a+b,0) + latheLive.datasets['Over issue'].reduce((a,b)=>a+b,0) + latheLive.datasets['ADV'].reduce((a,b)=>a+b,0) - latheLive.targets.reduce((a,b)=>a+b,0);
+            updateExecutiveReport(mDiff, lDiff, millingTotalDays, latheTotalDays);
+        }
+
+        function renderChart(canvasId, liveData, statusId) {
+            const ds = liveData.datasets;
+            const targets = liveData.targets;
+
+            const totals = days.map((_, i) => (ds['Plan WK'][i] || 0) + (ds['Backlog'][i] || 0) + (ds['Over issue'][i] || 0) + (ds['ADV'][i] || 0));
+            const totalOutput = totals.reduce((a, b) => a + b, 0);
+            const totalTarget = targets.reduce((a, b) => a + b, 0);
+            const diff = totalOutput - totalTarget;
+
+            document.getElementById(statusId).innerHTML = diff < 0 
+                ? `<span class="badge-minus">${Math.abs(diff).toLocaleString()} หน่วย (ต่ำเป้า)</span>` 
+                : `<span class="badge-plus">+${diff.toLocaleString()} หน่วย (เกินเป้า)</span>`;
+
+            const shortfallData = totals.map((tot, i) => Math.max(0, targets[i] - tot));
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            
+            if (canvasId === 'millingChart' && millingChartInst) millingChartInst.destroy();
+            if (canvasId === 'latheChart' && latheChartInst) latheChartInst.destroy();
+
+            const config = {
+                type: 'bar',
+                data: {
+                    labels: days,
+                    datasets: [
+                        { label: 'Plan WK', data: ds['Plan WK'], backgroundColor: 'rgba(16, 185, 129, 0.85)', stack: 'stack', maxBarThickness: 26 },
+                        { label: 'Backlog', data: ds['Backlog'], backgroundColor: 'rgba(59, 130, 246, 0.85)', stack: 'stack', maxBarThickness: 26 },
+                        { label: 'Over issue', data: ds['Over issue'], backgroundColor: 'rgba(239, 68, 68, 0.85)', stack: 'stack', maxBarThickness: 26 },
+                        { label: 'ADV', data: ds['ADV'], backgroundColor: 'rgba(245, 158, 11, 0.85)', stack: 'stack', maxBarThickness: 26 },
+                        { 
+                            label: 'Shortfall', 
+                            data: shortfallData, 
+                            backgroundColor: 'rgba(255, 255, 255, 0.05)', 
+                            borderColor: 'rgba(239, 68, 68, 0.5)',
+                            borderWidth: 1,
+                            borderDash: [3, 3],
+                            stack: 'stack',
+                            maxBarThickness: 26
+                        },
+                        { 
+                            label: 'Target Line', 
+                            data: targets, 
+                            type: 'line', 
+                            borderColor: '#f43f5e', 
+                            backgroundColor: '#f43f5e', 
+                            borderWidth: 2.5, 
+                            borderDash: [6, 6], 
+                            fill: false,
+                            pointRadius: 4,
+                            datalabels: { display: false } 
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { color: '#f8fafc', font: { size: 11, weight: '600' }, boxWidth: 12 } },
+                        datalabels: {
+                            color: '#ffffff',
+                            font: { weight: 'bold', size: 10 },
+                            formatter: function(value, context) {
+                                if (value === 0 || context.dataset.label === 'Shortfall') return '';
+                                return value.toLocaleString();
+                            }
+                        },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 } } },
+                        y: { stacked: true, beginAtZero: true, grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 11 } } }
+                    }
+                }
+            };
+
+            if (canvasId === 'millingChart') millingChartInst = new Chart(ctx, config);
+            if (canvasId === 'latheChart') latheChartInst = new Chart(ctx, config);
+        }
+
+        function updateWorkloadBarCharts(millingPlan, millingBacklog, millingOverIssue, lathePlan, latheBacklog, latheOverIssue) {
+            const ctxMilling = document.getElementById('millingWorkloadChart').getContext('2d');
+            if (millingWorkloadInst) millingWorkloadInst.destroy();
+            millingWorkloadInst = new Chart(ctxMilling, {
+                type: 'bar',
+                data: {
+                    labels: ['Milling Workload'],
+                    datasets: [
+                        { label: 'Plan Remain', data: [millingPlan], backgroundColor: 'rgba(56, 189, 248, 0.85)', maxBarThickness: 35 },
+                        { label: 'Backlog Remain', data: [millingBacklog], backgroundColor: 'rgba(30, 64, 175, 0.85)', maxBarThickness: 35 },
+                        { label: 'Over issue Remain', data: [millingOverIssue], backgroundColor: 'rgba(239, 68, 68, 0.85)', maxBarThickness: 35 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { color: '#f8fafc', font: { size: 10 }, boxWidth: 10 } },
+                        datalabels: { color: '#fff', font: { weight: 'bold', size: 10 }, formatter: v => v > 0 ? v.toLocaleString() : '' }
+                    },
+                    scales: {
+                        x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                        y: { stacked: true, beginAtZero: true, grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                    }
+                }
+            });
+
+            const ctxLathe = document.getElementById('latheWorkloadChart').getContext('2d');
+            if (latheWorkloadInst) latheWorkloadInst.destroy();
+            latheWorkloadInst = new Chart(ctxLathe, {
+                type: 'bar',
+                data: {
+                    labels: ['Lathe Workload'],
+                    datasets: [
+                        { label: 'Plan Remain', data: [lathePlan], backgroundColor: 'rgba(52, 211, 153, 0.85)', maxBarThickness: 35 },
+                        { label: 'Backlog Remain', data: [latheBacklog], backgroundColor: 'rgba(6, 95, 70, 0.85)', maxBarThickness: 35 },
+                        { label: 'Over issue Remain', data: [latheOverIssue], backgroundColor: 'rgba(239, 68, 68, 0.85)', maxBarThickness: 35 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { color: '#f8fafc', font: { size: 10 }, boxWidth: 10 } },
+                        datalabels: { color: '#fff', font: { weight: 'bold', size: 10 }, formatter: v => v > 0 ? v.toLocaleString() : '' }
+                    },
+                    scales: {
+                        x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                        y: { stacked: true, beginAtZero: true, grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        window.onload = function() {
+            buildTable('milling', initialMillingData, handleUserInputChange);
+            buildTable('lathe', initialLatheData, handleUserInputChange);
+            
+            if (!loadFromLocalStorage()) {
+                document.getElementById('save-timestamp').innerText = '-';
+            }
+
+            document.querySelectorAll('.workload-box input').forEach(inp => {
+                inp.addEventListener('input', handleUserInputChange);
+            });
+
+            refreshChartsOnly();
+        };
+    </script>
+</body>
+</html>
